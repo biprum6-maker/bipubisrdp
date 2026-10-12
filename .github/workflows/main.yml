@@ -38,20 +38,13 @@ jobs:
 
       - name: Establish Tailscale Connection
         run: |
-          authKey = "{{ secrets.TAILSCALE_AUTHKEY }}"
-          if (-not \(authKey) {\)authKey = "tskey-auth-koJWfTLhGN11CNTRL-sdV2awTZ26CDEHBBBhz46Ch92qNaBARWH"
-          }
-          \$tsPath = "C:\Program Files\Tailscale\tailscale.exe"
-          Start-Process tsPath -ArgumentList "up --authkey=authKey --hostname=gh-runner-win11" -Wait
-          Start-Sleep -Seconds 10
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=tskey-auth-koJWfTLhGN11CNTRL-sdV2awTZ26CDEHBBBhz46Ch92qNaBARWH --hostname=gh-runner-win11
+          Start-Sleep -Seconds 15
 
       - name: Maintain Connection + Watch RDP User
         run: |
-          \$tsPath = "C:\Program Files\Tailscale\tailscale.exe"
-          \(tsIP = &\)tsPath ip -4
-          
           Write-Host "`n=== RDP ACCESS ==="
-          Write-Host "Address: $tsIP"
+          & "C:\Program Files\Tailscale\tailscale.exe" ip -4
           Write-Host "Username: RDP"
           Write-Host "Password: TechZonerRDP2026"
           Write-Host "==================`n"
