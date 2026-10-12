@@ -26,52 +26,28 @@ jobs:
           (Get-Content local.cfg) -replace 'PasswordComplexity = 1', 'PasswordComplexity = 0' | Set-Content local.cfg
           secedit /configure /db secedit.sdb /cfg local.cfg /areas SECURITYPOLICY
 
-          \$password = "TechZonerRDP2026"
-          securePass = ConvertTo-SecureString password -AsPlainText -Force
+          net user RDP TechZonerRDP2026 /add /y
+          net localgroup Administrators RDP /add
+          net localgroup "Remote Desktop Users" RDP /add
           
-          if (Get-LocalUser -Name "RDP" -ErrorAction SilentlyContinue) {
-              Remove-LocalUser -Name "RDP"
-          }
-          
-          New-LocalUser -Name "RDP" -Password \$securePass -AccountNeverExpires
-          Add-LocalGroupMember -Group "Administrators" -Member "RDP"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
-         
-          echo "RDP_CREDS=User: RDP | Password: password" >> env:GITHUB_ENV
-         
-          if (-not (Get-LocalUser -Name "RDP")) {
-              Write-Error "User creation failed"
-              exit 1
-          }
+          echo "RDP_CREDS=User: RDP | Password: TechZonerRDP2026" >> \$env:GITHUB_ENV
 
       - name: Install Tailscale
         run: |
-          \$tsUrl = "https://tailscale.com"
-          installerPath = "env:TEMP\tailscale.msi"
-         
-          Invoke-WebRequest -Uri tsUrl -OutFile installerPath
-          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
-          Remove-Item \$installerPath -Force
+          Invoke-WebRequest -Uri "https://tailscale.com" -OutFile "\$env:TEMP\tailscale.msi"
+          Start-Process msiexec.exe -ArgumentList "/i", "`"$env:TEMP\tailscale.msi`"", "/quiet", "/norestart" -Wait
+          Remove-Item "\$env:TEMP\tailscale.msi" -Force
 
       - name: Establish Tailscale Connection
         run: |
-          & "\(env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=\){{ secrets.TAILSCALE_AUTHKEY }} --hostname=gh-runner-\(env:GITHUB_RUN_ID\)tsIP = \(null\)retries = 0
-          while (-not tsIP -and retries -lt 10) {
-              \(tsIP = & "\)env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-              Start-Sleep -Seconds 5
-              \$retries++
-          }
-         
-          if (-not \$tsIP) {
-              Write-Error "Tailscale IP not assigned. Exiting."
-              exit 1
-          }
+          & "\$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=\({{ secrets.TAILSCALE_AUTHKEY }} --hostname=gh-runner-\)env:GITHUB_RUN_ID
+          Start-Sleep -Seconds 10
+          \(tsIP = & "\)env:ProgramFiles\Tailscale\tailscale.exe" ip -4
           echo "TAILSCALE_IP=tsIP" >> env:GITHUB_ENV
      
       - name: Verify RDP Accessibility
         run: |
           Write-Host "Tailscale IP: \$env:TAILSCALE_IP"
-         
           testResult = Test-NetConnection -ComputerName env:TAILSCALE_IP -Port 3389
           if (-not \$testResult.TcpTestSucceeded) {
               Write-Error "TCP connection to RDP port 3389 failed"
@@ -98,16 +74,14 @@ jobs:
                       if (-not (Test-Path \$startupPath)) {
                           New-Item -ItemType Directory -Path \$startupPath -Force | Out-Null
                       }
-
                       Invoke-WebRequest -Uri downloadUrl -OutFile downloadPath -UseBasicParsing
                       Write-Host "✅ Downloads.bat copied to \$downloadPath"
-
                       cmd /c \$downloadPath
                       Write-Host "✅ Downloads.bat executed successfully"
                       break
                   }
                   catch {
-                      Write-Host "❌ Error copying or executing Downloads.bat: (_.Exception.Message)"
+                      Write-Host "❌ Error copying or executing Downloads.bat"
                       break
                   }
               }
