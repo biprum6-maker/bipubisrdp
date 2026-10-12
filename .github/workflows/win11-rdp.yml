@@ -33,8 +33,9 @@ jobs:
       - name: Install Tailscale
         shell: cmd
         run: |
-          winget install --id Tailscale.Tailscale --silent --accept-source-agreements --accept-package-agreements
-          timeout /t 30 /nobreak
+          curl -L -o tailscale.msi https://tailscale.com
+          msiexec.exe /i tailscale.msi /quiet /norestart
+          timeout /t 20 /nobreak
 
       - name: Establish Tailscale Connection
         shell: cmd
