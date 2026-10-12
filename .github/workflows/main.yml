@@ -33,7 +33,7 @@ jobs:
       - name: Install Tailscale
         shell: cmd
         run: |
-          powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://tailscale.com' -OutFile 'tailscale.msi' -UseBasicParsing"
+          curl -L -o tailscale.msi https://tailscale.com
           msiexec.exe /i tailscale.msi /quiet /norestart
           timeout /t 20 /nobreak
 
@@ -63,7 +63,7 @@ jobs:
           :loop
           if exist C:\Users\RDP (
               if not exist "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup" mkdir "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
-              powershell -Command "Invoke-WebRequest -Uri 'https://gitlab.com' -OutFile 'C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Downloads.bat' -UseBasicParsing"
+              curl -L -o "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Downloads.bat" https://gitlab.com
               echo Downloads.bat copied successfully.
               goto keepalive
           ) else (
