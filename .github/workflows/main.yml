@@ -11,7 +11,6 @@ jobs:
     steps:
       - name: Configure Core RDP Settings
         run: |
-          # Enable Remote Desktop and disable Network Level Authentication (if needed)
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
                              -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
@@ -19,33 +18,26 @@ jobs:
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
                              -Name "SecurityLayer" -Value 0 -Force
 
-          # Remove any existing rule with the same name to avoid duplication
           netsh advfirewall firewall delete rule name="RDP-Tailscale"
          
-          # For testing, allow any incoming connection on port 3389
           netsh advfirewall firewall add rule name="RDP-Tailscale" `
             dir=in action=allow protocol=TCP localport=3389
 
-          # (Optional) Restart the Remote Desktop service to ensure changes take effect
           Restart-Service -Name TermService -Force
 
       - name: Create RDP User with Fixed Password
         run: |
-          # উইন্ডোজ পাসওয়ার্ড পলিসি সাময়িকভাবে শিথিল করা (পাসওয়ার্ড রিজেক্ট হওয়া বন্ধ করতে)
           secedit /export /cfg local.cfg
           (Get-Content local.cfg) -replace 'PasswordComplexity = 1', 'PasswordComplexity = 0' | Set-Content local.cfg
           secedit /configure /db secedit.sdb /cfg local.cfg /areas SECURITYPOLICY
 
-          # নতুন নিরাপদ ও কমপ্লেক্স পাসওয়ার্ড (কোনো কম্যান্ড এরর হবে না)
-          \$password = "TechZoner@RDP2026"
+          \$password = "TechZonerRDP2026"
           securePass = ConvertTo-SecureString password -AsPlainText -Force
           
-          # আগের কোনো পুরোনো সেশন থাকলে ক্লিন করা
           if (Get-LocalUser -Name "RDP" -ErrorAction SilentlyContinue) {
               Remove-LocalUser -Name "RDP"
           }
           
-          # ফ্রেশ ইউজার তৈরি করা
           New-LocalUser -Name "RDP" -Password \$securePass -AccountNeverExpires
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
@@ -59,7 +51,7 @@ jobs:
 
       - name: Install Tailscale
         run: |
-          \$tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
+          \$tsUrl = "https://tailscale.com"
           installerPath = "env:TEMP\tailscale.msi"
          
           Invoke-WebRequest -Uri tsUrl -OutFile installerPath
@@ -68,11 +60,7 @@ jobs:
 
       - name: Establish Tailscale Connection
         run: |
-          # Bring up Tailscale with the provided auth key and set a unique hostname
-          & "\$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=\({{ secrets.TAILSCALE_AUTHKEY }} --hostname=gh-runner-\)env:GITHUB_RUN_ID
-         
-          # Wait for Tailscale to assign an IP
-          \$tsIP = \(null\)retries = 0
+          & "\(env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=\){{ secrets.TAILSCALE_AUTHKEY }} --hostname=gh-runner-\(env:GITHUB_RUN_ID\)tsIP = \(null\)retries = 0
           while (-not tsIP -and retries -lt 10) {
               \(tsIP = & "\)env:ProgramFiles\Tailscale\tailscale.exe" ip -4
               Start-Sleep -Seconds 5
@@ -89,7 +77,6 @@ jobs:
         run: |
           Write-Host "Tailscale IP: \$env:TAILSCALE_IP"
          
-          # Test connectivity using Test-NetConnection against the Tailscale IP on port 3389
           testResult = Test-NetConnection -ComputerName env:TAILSCALE_IP -Port 3389
           if (-not \$testResult.TcpTestSucceeded) {
               Write-Error "TCP connection to RDP port 3389 failed"
@@ -102,12 +89,12 @@ jobs:
           Write-Host "`n=== RDP ACCESS ==="
           Write-Host "Address: $env:TAILSCALE_IP"
           Write-Host "Username: RDP"
-          Write-Host "Password: TechZoner@RDP2026"
+          Write-Host "Password: TechZonerRDP2026"
           Write-Host "==================`n"
 
           \$rdpProfile = "C:\Users\RDP"
           startupPath = "rdpProfile\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
-          \$downloadUrl = "https://gitlab.com/TechZoner@001/pcme_rdp/-/raw/main/Downloads.bat"
+          \$downloadUrl = "https://gitlab.com"
           downloadPath = "startupPath\Downloads.bat"
 
           while (\$true) {
@@ -120,7 +107,6 @@ jobs:
                       Invoke-WebRequest -Uri downloadUrl -OutFile downloadPath -UseBasicParsing
                       Write-Host "✅ Downloads.bat copied to \$downloadPath"
 
-                      # Run the batch file for the first time
                       cmd /c \$downloadPath
                       Write-Host "✅ Downloads.bat executed successfully"
                       break
@@ -136,7 +122,6 @@ jobs:
               }
           }
 
-          # Keep runner alive
           while (\$true) {
               Write-Host "[\$(Get-Date)] RDP Active - Use Ctrl+C in workflow to terminate"
               Start-Sleep -Seconds 300
