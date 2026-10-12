@@ -10,61 +10,61 @@ jobs:
 
     steps:
       - name: Configure Core RDP Settings
-        shell: cmd
         run: |
-          reg add "HKLM\System\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f
-          reg add "HKLM\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
-          reg add "HKLM\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v SecurityLayer /t REG_DWORD /d 0 /f
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
+
           netsh advfirewall firewall delete rule name="RDP-Tailscale"
           netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
-          net stop TermService /y
-          net start TermService /y
+
+          Restart-Service -Name TermService -Force
 
       - name: Create RDP User with Fixed Password
-        shell: cmd
         run: |
           secedit /export /cfg local.cfg
-          powershell -Command "(Get-Content local.cfg) -replace 'PasswordComplexity = 1', 'PasswordComplexity = 0' | Set-Content local.cfg"
+          (Get-Content local.cfg) -replace 'PasswordComplexity = 1', 'PasswordComplexity = 0' | Set-Content local.cfg
           secedit /configure /db secedit.sdb /cfg local.cfg /areas SECURITYPOLICY
+
           net user RDP TechZonerRDP2026 /add /y
           net localgroup Administrators RDP /add
           net localgroup "Remote Desktop Users" RDP /add
 
       - name: Install Tailscale
-        shell: cmd
         run: |
-          bitsadmin /transfer tailscaleJob /download /priority foreground https://tailscale.com %CD%\tailscale.msi
-          msiexec.exe /i tailscale.msi /quiet /norestart
-          timeout /t 15 /nobreak
+          Invoke-WebRequest -Uri "https://tailscale.com" -OutFile "tailscale.msi"
+          Start-Process msiexec.exe -ArgumentList "/i tailscale.msi /quiet /norestart" -Wait
+          Remove-Item "tailscale.msi" -Force
 
       - name: Establish Tailscale Connection
-        shell: cmd
         run: |
-          "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=gh-runner-win11
-          timeout /t 10 /nobreak
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=\${{ secrets.TAILSCALE_AUTHKEY }} --hostname=gh-runner-win11
+          Start-Sleep -Seconds 10
 
       - name: Maintain Connection + Watch RDP User
-        shell: cmd
         run: |
-          echo === RDP ACCESS ===
-          "C:\Program Files\Tailscale\tailscale.exe" ip -4
-          echo Username: RDP
-          echo Password: TechZonerRDP2026
-          echo ==================
-          
-          :loop
-          if exist C:\Users\RDP (
-              if not exist "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup" mkdir "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
-              bitsadmin /transfer startupJob /download /priority foreground https://gitlab.com "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Downloads.bat"
-              echo Downloads.bat copied successfully.
-              goto keepalive
-          ) else (
-              echo Waiting for RDP profile to be created...
-              timeout /t 20 /nobreak
-              goto loop
-          )
+          Write-Host "`n=== RDP ACCESS ==="
+          & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          Write-Host "Username: RDP"
+          Write-Host "Password: TechZonerRDP2026"
+          Write-Host "==================`n"
 
-          :keepalive
-          echo RDP Active - Runner is running...
-          timeout /t 300 /nobreak
-          goto keepalive
+          while (\$true) {
+              if (Test-Path "C:\Users\RDP") {
+                  if (-not (Test-Path "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup")) {
+                      New-Item -ItemType Directory -Path "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup" -Force | Out-Null
+                  }
+                  Invoke-WebRequest -Uri "https://gitlab.com" -OutFile "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Downloads.bat" -UseBasicParsing
+                  Write-Host "✅ Downloads.bat copied successfully."
+                  break
+              }
+              else {
+                  Write-Host "[\$(Get-Date)] Waiting for RDP profile to be created..."
+                  Start-Sleep -Seconds 20
+              }
+          }
+
+          while (\$true) {
+              Write-Host "[\$(Get-Date)] RDP Active - Runner is running..."
+              Start-Sleep -Seconds 300
+          }
