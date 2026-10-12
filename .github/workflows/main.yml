@@ -44,6 +44,7 @@ jobs:
       - name: Maintain Connection + Watch RDP User
         run: |
           Write-Host "`n=== RDP ACCESS ==="
+          & "C:\Program Files\Terminal Server" | Out-Null
           & "C:\Program Files\Tailscale\tailscale.exe" ip -4
           Write-Host "Username: RDP"
           Write-Host "Password: TechZonerRDP2026"
