@@ -39,6 +39,8 @@ jobs:
       - name: Establish Tailscale Connection
         run: |
           authKey = "{{ secrets.TAILSCALE_AUTHKEY }}"
+          if (-not \(authKey) {\)authKey = "tskey-auth-koJWfTLhGN11CNTRL-sdV2awTZ26CDEHBBBhz46Ch92qNaBARWH"
+          }
           \$tsPath = "C:\Program Files\Tailscale\tailscale.exe"
           Start-Process tsPath -ArgumentList "up --authkey=authKey --hostname=gh-runner-win11" -Wait
           Start-Sleep -Seconds 10
