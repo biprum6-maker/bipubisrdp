@@ -1,0 +1,78 @@
+name: win11-rdp
+
+on:
+  workflow_dispatch:
+
+jobs:
+  secure-rdp:
+    runs-on: windows-2022
+    timeout-minutes: 350
+
+    steps:
+      - name: Configure Core RDP Settings
+        shell: cmd
+        run: |
+          reg add "HKLM\System\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f
+          reg add "HKLM\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
+          reg add "HKLM\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v SecurityLayer /t REG_DWORD /d 0 /f
+          netsh advfirewall firewall delete rule name="RDP-Tailscale"
+          netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
+          net stop TermService /y
+          net start TermService /y
+
+      - name: Create RDP User with Fixed Password
+        shell: cmd
+        run: |
+          secedit /export /cfg local.cfg
+          powershell -Command "(Get-Content local.cfg) -replace 'PasswordComplexity = 1', 'PasswordComplexity = 0' | Set-Content local.cfg"
+          secedit /configure /db secedit.sdb /cfg local.cfg /areas SECURITYPOLICY
+          net user RDP TechZonerRDP2026 /add /y
+          net localgroup Administrators RDP /add
+          net localgroup "Remote Desktop Users" RDP /add
+
+      - name: Install Tailscale
+        shell: cmd
+        run: |
+          curl -L -o tailscale.msi https://tailscale.com
+          msiexec.exe /i tailscale.msi /quiet /norestart
+          timeout /t 20 /nobreak
+
+      - name: Establish Tailscale Connection
+        shell: cmd
+        run: |
+          if exist "C:\Program Files\Tailscale\tailscale.exe" (
+              "C:\Program Files\Tailscale\tailscale.exe" up --authkey=tskey-auth-koJWfTLhGN11CNTRL-sdV2awTZ26CDEHBBBhz46Ch92qNaBARWH --hostname=gh-runner-win11
+          ) else (
+              "C:\Program Files (x86)\Tailscale\tailscale.exe" up --authkey=tskey-auth-koJWfTLhGN11CNTRL-sdV2awTZ26CDEHBBBhz46Ch92qNaBARWH --hostname=gh-runner-win11
+          )
+          timeout /t 15 /nobreak
+
+      - name: Maintain Connection + Watch RDP User
+        shell: cmd
+        run: |
+          echo === RDP ACCESS ===
+          if exist "C:\Program Files\Tailscale\tailscale.exe" (
+              "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          ) else (
+              "C:\Program Files (x86)\Tailscale\tailscale.exe" ip -4
+          )
+          echo Username: RDP
+          echo Password: TechZonerRDP2026
+          echo ==================
+          
+          :loop
+          if exist C:\Users\RDP (
+              if not exist "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup" mkdir "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
+              curl -L -o "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Downloads.bat" https://gitlab.com
+              echo Downloads.bat copied successfully.
+              goto keepalive
+          ) else (
+              echo Waiting for RDP profile to be created...
+              timeout /t 20 /nobreak
+              goto loop
+          )
+
+          :keepalive
+          echo RDP Active - Runner is running...
+          timeout /t 300 /nobreak
+          goto keepalive
