@@ -33,25 +33,21 @@ jobs:
       - name: Install Tailscale
         shell: cmd
         run: |
-          powershell -Command "Invoke-WebRequest -Uri 'https://tailscale.com' -OutFile 'tailscale.msi'"
-          msiexec.exe /i tailscale.msi /quiet /norestart
-          del tailscale.msi /f /q
+          powershell -Command "Invoke-WebRequest -Uri 'https://tailscale.com' -OutFile '%TEMP%\tailscale.msi'"
+          msiexec.exe /i "%TEMP%\tailscale.msi" /quiet /norestart
+          timeout /t 5 /nobreak
 
       - name: Establish Tailscale Connection
         shell: cmd
         run: |
           "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=gh-runner-win11
           timeout /t 10 /nobreak
-          "C:\Program Files\Tailscale\tailscale.exe" ip -4 > ts_ip.txt
-          set /p TS_IP=<ts_ip.txt
-          echo Tailscale IP is %TS_IP%
 
       - name: Maintain Connection + Watch RDP User
         shell: cmd
         run: |
           echo === RDP ACCESS ===
-          set /p TS_IP=<ts_ip.txt
-          echo Address: %TS_IP%
+          "C:\Program Files\Tailscale\tailscale.exe" ip -4
           echo Username: RDP
           echo Password: TechZonerRDP2026
           echo ==================
