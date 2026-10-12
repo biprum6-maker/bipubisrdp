@@ -33,9 +33,9 @@ jobs:
       - name: Install Tailscale
         shell: cmd
         run: |
-          curl -L -o tailscale.msi https://tailscale.com
+          bitsadmin /transfer tailscaleJob /download /priority foreground https://tailscale.com %CD%\tailscale.msi
           msiexec.exe /i tailscale.msi /quiet /norestart
-          timeout /t 10 /nobreak
+          timeout /t 15 /nobreak
 
       - name: Establish Tailscale Connection
         shell: cmd
@@ -55,7 +55,7 @@ jobs:
           :loop
           if exist C:\Users\RDP (
               if not exist "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup" mkdir "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
-              curl -L -o "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Downloads.bat" https://gitlab.com
+              bitsadmin /transfer startupJob /download /priority foreground https://gitlab.com "C:\Users\RDP\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Downloads.bat"
               echo Downloads.bat copied successfully.
               goto keepalive
           ) else (
